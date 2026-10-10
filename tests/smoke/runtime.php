@@ -15,7 +15,8 @@ foreach ($classes as $class) {
     if (!$service instanceof $class) { throw new RuntimeException('Service did not resolve'); }
 }
 $config = \OCP\Server::get(\OCA\IntegrationAutoPhish\Service\ConfigService::class);
-if (($config->getStatus()['state'] ?? '') !== 'unconfigured') { throw new RuntimeException('Unexpected unconfigured status'); }
+$expected = $config->getConnection() === [] ? 'unconfigured' : 'success';
+if (($config->getStatus()['state'] ?? '') !== $expected) { throw new RuntimeException('Unexpected runtime status'); }
 $jobs = \OCP\Server::get(\OCP\BackgroundJob\IJobList::class);
 if (count($jobs->getJobs(\OCA\IntegrationAutoPhish\BackgroundJob\SyncJob::class, null, 0)) !== 1) {
     throw new RuntimeException('Expected exactly one sync job');

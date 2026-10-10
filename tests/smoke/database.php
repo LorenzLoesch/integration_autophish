@@ -12,6 +12,8 @@ $second = new SyncLock($db, $clock);
 $config = new ConfigService($db, Server::get(\OCP\Security\ICrypto::class), $first);
 if (!$first->acquire() || $second->acquire()) { throw new RuntimeException('Shared mutex did not exclude overlap'); }
 $config->saveConnection('https://autophish.example.test', 'fixture-company', 'mock-smoke-key', 300);
+$config->saveMappings([['groupId' => 'fixture-group', 'listId' => 'fixture-list', 'enabled' => false]]);
+$config->setPendingCreation(['groupId' => 'fixture-pending-group', 'name' => 'Fixture pending list', 'key' => 'mock-pending-key', 'createdAt' => time()]);
 $revision = $config->getRevision();
 if ($config->getConnection()['apiKey'] !== 'mock-smoke-key') { throw new RuntimeException('Encrypted connection round trip failed'); }
 if (str_contains(json_encode($config->getPublicConnection()), 'mock-smoke-key')) { throw new RuntimeException('Public state disclosed a key'); }

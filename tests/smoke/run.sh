@@ -22,15 +22,14 @@ php /probes/runtime.php
 php occ background:cron
 job_id=$(php /probes/job-id.php)
 php occ background-job:execute "$job_id" --force-execute
+php /probes/database.php
 php occ config:app:set integration_autophish smoke_upgrade --value retained
 tar -xzf /release.tar.gz -C custom_apps
 php occ upgrade
 [[ $(php occ config:app:get integration_autophish smoke_upgrade) == retained ]]
-sync_exit=0
-php occ integration_autophish:sync || sync_exit=$?
-[[ $sync_exit == 1 ]] # An unconfigured manual sync reports failure, without any network call.
+php /probes/upgrade-state.php
+php occ integration_autophish:sync # Disabled fixture mappings cause no SaaS call.
 php /probes/runtime.php
-php /probes/database.php
 # Seed disposable sensitive/local state; offline cleanup must clear all of it.
 php occ config:app:set integration_autophish smoke_key --value mock-encrypted-state
 php occ config:app:set integration_autophish smoke_mapping --value mock-local-mapping
