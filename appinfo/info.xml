@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+  <id>integration_autophish</id>
+  <name>AutoPhish</name>
+  <summary>Synchronize Nextcloud groups with AutoPhish target lists</summary>
+  <description>Connect an AutoPhish company with a least-privilege API key and synchronize dedicated target lists from Nextcloud groups. Synchronization adds current members and removes stale list memberships.</description>
+  <version>1.0.0</version>
+  <licence>agpl</licence>
+  <author>AutoPhish</author>
+  <namespace>IntegrationAutoPhish</namespace>
+  <category>integration</category>
+  <dependencies>
+    <php min-version="8.3" />
+    <nextcloud min-version="32" max-version="32" />
+  </dependencies>
+</info>
