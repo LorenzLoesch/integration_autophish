@@ -72,8 +72,12 @@ class SettingsController extends Controller {
                 if ($pending !== [] && time() - $pending['createdAt'] >= 86400) {
                     throw new \InvalidArgumentException('The uncertain list creation is older than 24 hours. Check AutoPhish for the created list, then attach that existing list.');
                 }
+                $fingerprint = hash('sha256', $connection['apiKey']);
+                if ($pending !== [] && (!is_string($pending['credentialFingerprint'] ?? null) || !hash_equals($pending['credentialFingerprint'], $fingerprint))) {
+                    throw new \InvalidArgumentException('The API key changed or the original creation credential is unknown. Inspect AutoPhish and attach the existing list instead of retrying creation.');
+                }
                 if ($pending === []) {
-                    $pending = ['groupId' => $groupId, 'name' => $name, 'key' => 'nc-list-' . bin2hex(random_bytes(16)), 'createdAt' => time()];
+                    $pending = ['credentialFingerprint' => $fingerprint, 'groupId' => $groupId, 'name' => $name, 'key' => 'nc-list-' . bin2hex(random_bytes(16)), 'createdAt' => time()];
                     $this->config->setPendingCreation($pending);
                 }
                 $list = $this->api->createList($connection, $name, $pending['key']);

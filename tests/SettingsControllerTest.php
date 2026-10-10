@@ -70,10 +70,10 @@ class SettingsControllerTest extends TestCase {
     public function testUncertainCreateReusesSavedKeyAndPersistsMappingBeforeRelease(): void {
         [$controller, $config, $api, $lock, $groups] = $this->controller();
         $group = $this->createMock(IGroup::class); $group->method('getDisplayName')->willReturn('Staff'); $groups->method('get')->with('staff')->willReturn($group);
-        $config->method('getMappings')->willReturn([]); $config->method('getConnection')->willReturn(['companyId' => 'c']);
-        $pending = ['groupId' => 'staff', 'name' => 'Staff', 'key' => 'saved-key', 'createdAt' => time()];
+        $config->method('getMappings')->willReturn([]); $config->method('getConnection')->willReturn(['companyId' => 'c', 'apiKey' => 'fixture']);
+        $pending = ['credentialFingerprint' => hash('sha256', 'fixture'), 'groupId' => 'staff', 'name' => 'Staff', 'key' => 'saved-key', 'createdAt' => time()];
         $config->method('getPendingCreation')->willReturn($pending);
-        $api->expects(self::once())->method('createList')->with(['companyId' => 'c'], 'Staff', 'saved-key')->willReturn(['id' => 'list', 'name' => 'Staff']);
+        $api->expects(self::once())->method('createList')->with(['companyId' => 'c', 'apiKey' => 'fixture'], 'Staff', 'saved-key')->willReturn(['id' => 'list', 'name' => 'Staff']);
         $saved = false;
         $config->expects(self::once())->method('saveMappings')->willReturnCallback(function ($mappings) use (&$saved) { self::assertSame('list', $mappings[0]['listId']); $saved = true; });
         $config->expects(self::once())->method('setPendingCreation')->with([]);
@@ -102,10 +102,12 @@ class SettingsControllerTest extends TestCase {
         self::assertSame(200, $controller->clearPendingCreation(true)->getStatus());
     }
     public function testSeparateCreateRequestsReusePersistedUncertainKey(): void {
+
         [$controller, $config, $api, $lock, $groups] = $this->controller();
         $groups->method('get')->willReturn($this->createMock(IGroup::class));
         $config->method('getMappings')->willReturn([]);
         $pending = [];
+        $config->method('getConnection')->willReturn(['apiKey' => 'fixture']);
         $config->method('getPendingCreation')->willReturnCallback(function () use (&$pending) { return $pending; });
         $config->method('setPendingCreation')->willReturnCallback(function ($value) use (&$pending) { $pending = $value; });
         $firstKey = null;
@@ -116,6 +118,51 @@ class SettingsControllerTest extends TestCase {
         });
         self::assertSame(502, $controller->addMapping('staff', '', 'Staff')->getStatus());
         self::assertSame(502, $controller->addMapping('staff', '', 'Staff')->getStatus());
+    }
+    public function testUncertainCreationCannotBeReplayedAfterCredentialRotationButCanAttachExistingList(): void {
+        $database = new FakeConfigDatabase($this->createMock(\OCP\IDBConnection::class), fn () => $this->createMock(\OCP\DB\IResult::class));
+        $crypto = $this->createMock(\OCP\Security\ICrypto::class);
+        $crypto->method('encrypt')->willReturnCallback(fn ($value) => 'encrypted:' . base64_encode($value));
+        $crypto->method('decrypt')->willReturnCallback(fn ($value) => base64_decode(substr($value, 10)));
+        $time = $this->createMock(\OCP\AppFramework\Utility\ITimeFactory::class); $time->method('getTime')->willReturn(12345);
+        $lock = new SyncLock($database->db, $time);
+        $config = new ConfigService($database->db, $crypto, $lock);
+        $group = $this->createMock(IGroup::class); $group->method('getDisplayName')->willReturn('Staff');
+        $groups = $this->createMock(IGroupManager::class); $groups->method('get')->with('staff')->willReturn($group); $groups->method('isAdmin')->willReturn(true);
+        $user = $this->createMock(IUser::class); $user->method('getUID')->willReturn('admin');
+        $session = $this->createMock(IUserSession::class); $session->method('getUser')->willReturn($user);
+        $client = $this->createMock(IClient::class);
+        $client->expects(self::once())->method('post')->willReturnCallback(function ($url, $options): never {
+            self::assertSame('Bearer old-fixture-key', $options['headers']['Authorization']);
+            throw new \RuntimeException('Response lost after remote creation');
+        });
+        $client->method('getResponseFromThrowable')->willThrowException(new \RuntimeException('No response'));
+        $response = $this->createMock(IResponse::class); $response->method('getStatusCode')->willReturn(200); $response->method('getBody')->willReturn('{"id":"existing-list","name":"Staff"}');
+        $client->expects(self::once())->method('get')->willReturnCallback(function ($url, $options) use ($response) {
+            self::assertSame('Bearer new-fixture-key', $options['headers']['Authorization']); return $response;
+        });
+        $http = $this->createMock(IClientService::class); $http->method('newClient')->willReturn($client);
+        $controller = new SettingsController('integration_autophish', $this->createMock(IRequest::class), $config, new ApiClient($http), $lock, $groups, $session);
+        self::assertSame(200, $controller->save('https://example.com', 'company', 'old-fixture-key')->getStatus());
+        self::assertSame(502, $controller->addMapping('staff', '', 'Staff')->getStatus());
+        $fingerprint = hash('sha256', 'old-fixture-key');
+        self::assertSame($fingerprint, $config->getPendingCreation()['credentialFingerprint']);
+        self::assertSame(200, $controller->save('https://example.com', 'company', 'new-fixture-key')->getStatus());
+        $retry = $controller->addMapping('staff', '', 'Staff');
+        self::assertSame(400, $retry->getStatus()); self::assertStringContainsString('API key changed', $retry->getData()['error']);
+        $public = json_encode($controller->state()->getData(), JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString($fingerprint, $public); self::assertStringNotContainsString('credentialFingerprint', $public);
+        self::assertStringNotContainsString('old-fixture-key', $public); self::assertStringNotContainsString('new-fixture-key', $public);
+        self::assertSame(200, $controller->addMapping('staff', 'existing-list')->getStatus());
+        self::assertSame([], $config->getPendingCreation()); self::assertSame('existing-list', $config->getMappings()[0]['listId']);
+    }
+    public function testLegacyPendingCreationWithoutCredentialFingerprintCannotBeRetried(): void {
+        [$controller, $config, $api, $lock, $groups] = $this->controller();
+        $groups->method('get')->willReturn($this->createMock(IGroup::class));
+        $config->method('getMappings')->willReturn([]); $config->method('getConnection')->willReturn(['apiKey' => 'fixture']);
+        $config->method('getPendingCreation')->willReturn(['groupId' => 'staff', 'name' => 'Staff', 'key' => 'saved-key', 'createdAt' => time()]);
+        $api->expects(self::never())->method('createList');
+        self::assertSame(400, $controller->addMapping('staff', '', 'Staff')->getStatus());
     }
     public function testManagedListCannotBeMapped(): void {
         [$controller, $config, $api, $lock, $groups] = $this->controller();

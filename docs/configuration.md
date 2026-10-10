@@ -10,7 +10,7 @@ Changing the server origin or company ID clears mappings, last-run status, and p
 
 ## New-list recovery
 
-Before a create request, the app persists a random idempotency key with the group, list name, and creation time. A failed or uncertain response preserves this record. Retry the original group and name to reuse the key; creation of a different list is blocked while the earlier creation remains unresolved. A successful response is mapped locally before releasing the lock.
+Before a create request, the app persists a random idempotency key with the group, list name, and creation time. A failed or uncertain response preserves this record. A local credential fingerprint binds retries to the original API key and is never returned to the browser. After rotating that key, or for older pending records without a fingerprint, creation retries are blocked: inspect AutoPhish and attach the existing list using the new key instead. Retry the original group and name to reuse the key; creation of a different list is blocked while the earlier creation remains unresolved. A successful response is mapped locally before releasing the lock.
 
 AutoPhish's replay window is 24 hours. After that time the app blocks another create request rather than risk a duplicate. Inspect AutoPhish for the original list and attach that existing list to the same group to resolve the pending operation. If no list exists, tick the inspection acknowledgement and clear the expired pending creation before attempting a fresh creation. The reset is rejected during the replay window and requires explicit confirmation that the administrator verified no list was created.
 

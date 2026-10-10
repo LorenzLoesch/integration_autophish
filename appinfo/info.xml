@@ -9,25 +9,9 @@
   <author>AutoPhish</author>
   <namespace>IntegrationAutoPhish</namespace>
   <category>integration</category>
-  <dependencies>
-    <php min-version="8.3" />
-    <nextcloud min-version="32" max-version="32" />
-  </dependencies>
-  <background-jobs>
-    <job>OCA\IntegrationAutoPhish\BackgroundJob\SyncJob</job>
-  </background-jobs>
-  <commands>
-    <command>OCA\IntegrationAutoPhish\Command\SyncCommand</command>
-  </commands>
-  <repair-steps>
-    <install>
-      <step>OCA\IntegrationAutoPhish\Migration\Install</step>
-    </install>
-    <post-migration>
-      <step>OCA\IntegrationAutoPhish\Migration\Install</step>
-    </post-migration>
-  </repair-steps>
-  <settings>
-    <admin>OCA\IntegrationAutoPhish\Settings\Admin</admin>
-  </settings>
+  <dependencies><php min-version="8.3"/><nextcloud min-version="32" max-version="32"/></dependencies>
+  <background-jobs><job>OCA\IntegrationAutoPhish\BackgroundJob\SyncJob</job></background-jobs>
+  <commands><command>OCA\IntegrationAutoPhish\Command\SyncCommand</command></commands>
+  <repair-steps><install><step>OCA\IntegrationAutoPhish\Migration\Install</step></install><post-migration><step>OCA\IntegrationAutoPhish\Migration\Install</step></post-migration><uninstall><step>OCA\IntegrationAutoPhish\Migration\Uninstall</step></uninstall></repair-steps>
+  <settings><admin>OCA\IntegrationAutoPhish\Settings\Admin</admin></settings>
 </info>
