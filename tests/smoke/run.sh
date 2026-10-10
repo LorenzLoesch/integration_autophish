@@ -47,4 +47,4 @@ php /probes/cleanup.php
 php occ app:enable integration_autophish
 php occ app:remove integration_autophish
 php /probes/cleanup.php
-printf 'Nextcloud 32 install/update/cron/command/disable/removal smoke passed\n'
+printf 'Nextcloud %s install/update/cron/command/disable/removal smoke passed\n' "$NEXTCLOUD_MAJOR"

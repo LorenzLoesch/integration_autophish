@@ -1,0 +1,124 @@
+name: Release app
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+permissions:
+  contents: read
+concurrency:
+  group: appstore-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    with:
+      release-tag: ${{ github.ref_name }}
+  sign-and-package:
+    needs: verify
+    if: github.repository == 'LorenzLoesch/nextcloud_autophish_plugin'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.3'
+          extensions: simplexml, openssl
+          coverage: none
+      - name: Sign, install, verify and compare two builds
+        env:
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          APP_CERTIFICATE: ${{ secrets.APP_CERTIFICATE }}
+          REQUIRE_SIGNING: 'true'
+        run: |
+          bash scripts/package.sh
+          cp dist/*.tar.gz /tmp/first-signed.tar.gz
+          bash scripts/package.sh
+          cmp /tmp/first-signed.tar.gz dist/*.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-package
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+            dist/*.tar.gz.sha512
+          if-no-files-found: error
+  release-signature:
+    needs: sign-and-package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.3'
+          extensions: simplexml, openssl
+          coverage: none
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: signed-package
+          path: dist
+      - run: bash scripts/release-signature.sh
+        env:
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          APP_CERTIFICATE: ${{ secrets.APP_CERTIFICATE }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+            dist/*.tar.gz.sha512
+            dist/*.tar.gz.sig
+          if-no-files-found: error
+  github-release:
+    needs: release-signature
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: dist
+      - run: python3 scripts/github-release.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+  appstore-publish:
+    needs: github-release
+    environment: appstore
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: dist
+      - id: publish
+        run: bash scripts/publish-appstore.sh
+        env:
+          APPSTORE_TOKEN: ${{ secrets.APPSTORE_TOKEN }}
+          PUBLISH_PRERELEASES: ${{ vars.PUBLISH_PRERELEASES }}
+      - name: Publication summary
+        env:
+          PUBLISHED: ${{ steps.publish.outputs.published }}
+        run: |
+          printf 'App Store publication performed: %s\n' "$PUBLISHED" >> "$GITHUB_STEP_SUMMARY"
+  post-publish-verify:
+    needs: appstore-publish
+    if: needs.appstore-publish.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: bash scripts/verify-appstore.sh

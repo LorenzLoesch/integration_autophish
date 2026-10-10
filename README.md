@@ -2,7 +2,7 @@
 
 Mirror selected Nextcloud groups into dedicated AutoPhish target lists using the existing public API. This app does not send simulations or provision accounts.
 
-Supported baseline: **Nextcloud 32, PHP 8.3+** (within Nextcloud's supported PHP range). License: [AGPL-3.0-or-later](license.md). Releases are unsigned manual-install packages; App Store publication is outside this release.
+Supported baseline: **Nextcloud 32–34, PHP 8.3+** (within Nextcloud's supported PHP range). License: [AGPL-3.0-or-later](license.md). Install **AutoPhish** (`integration_autophish`) from Nextcloud’s Apps administration once the first signed release is published to the [App Store](https://apps.nextcloud.com/apps/integration_autophish). The [release pipeline](docs/releasing.md) signs, verifies and publishes version tags automatically after the owner configures its credentials. Manual installation remains available as a fallback; local development builds are explicitly labelled `-unsigned`.
 
 ## Install and configure
 
@@ -50,6 +50,6 @@ Back up Nextcloud configuration/database. Replace the app directory with the new
 
 ## Development and verification
 
-Use PHP 8.3 and Node 24 (JavaScript syntax checks only). `composer install`, `npm ci`, `npm run lint`, `npm test`, `npm run build`. Tests mock every SaaS call. The archive uses an explicit runtime allowlist, deterministic timestamps/order/permissions and ships plain JavaScript/CSS without dev dependencies. `bash scripts/smoke-nextcloud.sh` runs disposable install, upgrade, cron/command and concurrent offline cleanup checks against Nextcloud 32 with SQLite. Repeat with `NEXTCLOUD_SMOKE_DB=pgsql` or `NEXTCLOUD_SMOKE_DB=mysql` for PostgreSQL or MariaDB; CI exercises all three. Docker is required for smoke checks; no live tenant is needed.
+Use PHP 8.3 and Node 24 (JavaScript syntax checks only). `composer install`, `npm ci`, `npm run lint`, `npm test`, `npm run build`. Tests mock every SaaS call. The archive uses an explicit runtime allowlist, deterministic timestamps/order/permissions and ships plain JavaScript/CSS without dev dependencies. `NEXTCLOUD_MAJOR=34 bash scripts/smoke-nextcloud.sh` selects the version (32, 33 or 34) for disposable install, upgrade, cron/command and concurrent offline cleanup checks with SQLite (default: 32). CI tests all three majors, plus `NEXTCLOUD_MAJOR=34 NEXTCLOUD_SMOKE_DB=pgsql` and `NEXTCLOUD_MAJOR=34 NEXTCLOUD_SMOKE_DB=mysql` for PostgreSQL and MariaDB. See [release checks and signing tests](docs/releasing.md#local-checks). Docker is required for smoke checks; no live tenant is needed.
 
 See [configuration](docs/configuration.md), [API client](docs/api-client.md) and [synchronization](docs/synchronization.md) for concise implementation behavior. Development docs/tests are in source only, outside the installable archive.

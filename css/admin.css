@@ -4,3 +4,5 @@
 #autophish-settings th, #autophish-settings td { padding: 8px; text-align: left; }
 #autophish-settings pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 #autophish-message { min-height: 24px; }
+#autophish-status { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 20px; margin: 16px 0; }
+#autophish-status dt, #autophish-status dd { float: none; width: auto; margin: 0; padding: 0; text-align: left; overflow-wrap: anywhere; }

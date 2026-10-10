@@ -1,40 +1,98 @@
 name: Verify app
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_call:
+    inputs:
+      release-tag:
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.3'
-          extensions: mbstring, dom, xml, zip
+          extensions: mbstring, dom, xml, zip, openssl
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y libxml2-utils
       - run: composer install --no-interaction --prefer-dist
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: npm run build
-      - name: Reproducible archive
+      - run: bash scripts/validate-info.sh
+      - name: Check official platform compatibility limit
         run: |
-          cp dist/*.tar.gz /tmp/first.tar.gz
+          curl --fail --silent --show-error --proto '=https' --retry 3 --max-time 60 \
+            https://apps.nextcloud.com/api/v1/platforms.json > .cache/platforms.json
+          python3 scripts/release.py platforms .cache/platforms.json
+      - name: Verify release tag and main ancestry
+        if: inputs.release-tag != ''
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          python3 scripts/release.py tag "$RELEASE_TAG"
+      - name: Build unsigned archive twice
+        run: |
           npm run build
-          cmp /tmp/first.tar.gz dist/*.tar.gz
-      - run: npm run smoke
-      - run: npm run smoke
-        env:
-          NEXTCLOUD_SMOKE_DB: pgsql
-      - run: npm run smoke
-        env:
-          NEXTCLOUD_SMOKE_DB: mysql
-      - uses: actions/upload-artifact@v4
+          cp dist/*-unsigned.tar.gz /tmp/first.tar.gz
+          npm run build
+          cmp /tmp/first.tar.gz dist/*-unsigned.tar.gz
+      - id: matrix
+        run: printf 'matrix=%s\n' "$(python3 scripts/release.py matrix)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: integration-autophish
-          path: dist/
+          name: integration-autophish-unsigned
+          path: dist/*-unsigned.tar.gz*
+          if-no-files-found: error
+  smoke:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.verify.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.3'
+          extensions: simplexml
+          coverage: none
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: integration-autophish-unsigned
+          path: dist
+      - run: bash scripts/smoke-nextcloud.sh
+        env:
+          NEXTCLOUD_MAJOR: ${{ matrix.major }}
+          NEXTCLOUD_SMOKE_DB: ${{ matrix.database }}
+  signing-fixture:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.3'
+          extensions: simplexml, openssl
+          coverage: none
+      - run: bash tests/release/signing.sh

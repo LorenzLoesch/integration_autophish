@@ -3,15 +3,31 @@
   <id>integration_autophish</id>
   <name>AutoPhish</name>
   <summary>Synchronize Nextcloud groups with AutoPhish target lists</summary>
-  <description>Connect an AutoPhish company with a least-privilege API key and synchronize dedicated target lists from Nextcloud groups. Synchronization adds current members and removes stale list memberships.</description>
-  <version>1.0.0</version>
+  <description><![CDATA[## Synchronize groups with AutoPhish
+
+Requires an AutoPhish account, a company ID and an API key with `targets:read` and `targets:write` permissions. Mirror selected Nextcloud groups into dedicated AutoPhish target lists, through scheduled or manual synchronization. Stale list memberships are removed after complete reads and verified additions; the app does not launch phishing simulations.
+
+### Data sent outside Nextcloud
+
+Selected members' primary email addresses and, for new recipients, display names (split into first and last names) are sent to the configured AutoPhish HTTPS service. Group membership is represented by membership in the mapped target list. Administrator-chosen list names, the API key and company ID are also sent. Nextcloud user IDs and group IDs remain local; no wider directory export or telemetry is performed.
+
+Administrators must authorize this transfer and verify recipient domains in AutoPhish before syncing. See the [AutoPhish privacy policy](https://autophish.io/privacy/service).
+]]></description>
+  <version>1.0.1</version>
   <licence>AGPL-3.0-or-later</licence>
-  <author>AutoPhish</author>
+  <author mail="support@autophish.io" homepage="https://autophish.io">QANDRYX Security GmbH</author>
   <namespace>IntegrationAutoPhish</namespace>
+  <documentation><admin>https://github.com/LorenzLoesch/nextcloud_autophish_plugin/blob/main/README.md#install-and-configure</admin></documentation>
   <category>integration</category>
-  <dependencies><php min-version="8.3"/><nextcloud min-version="32" max-version="32"/></dependencies>
+  <category>security</category>
+  <website>https://autophish.io</website>
+  <bugs>https://github.com/LorenzLoesch/nextcloud_autophish_plugin/issues</bugs>
+  <repository type="git">https://github.com/LorenzLoesch/nextcloud_autophish_plugin</repository>
+  <screenshot>https://raw.githubusercontent.com/LorenzLoesch/nextcloud_autophish_plugin/main/screenshots/admin-settings.png</screenshot>
+  <screenshot>https://raw.githubusercontent.com/LorenzLoesch/nextcloud_autophish_plugin/main/screenshots/sync-status.png</screenshot>
+  <dependencies><php min-version="8.3"/><nextcloud min-version="32" max-version="34"/></dependencies>
   <background-jobs><job>OCA\IntegrationAutoPhish\BackgroundJob\SyncJob</job></background-jobs>
+  <repair-steps><post-migration><step>OCA\IntegrationAutoPhish\Migration\Install</step></post-migration><install><step>OCA\IntegrationAutoPhish\Migration\Install</step></install><uninstall><step>OCA\IntegrationAutoPhish\Migration\Uninstall</step></uninstall></repair-steps>
   <commands><command>OCA\IntegrationAutoPhish\Command\SyncCommand</command></commands>
-  <repair-steps><install><step>OCA\IntegrationAutoPhish\Migration\Install</step></install><post-migration><step>OCA\IntegrationAutoPhish\Migration\Install</step></post-migration><uninstall><step>OCA\IntegrationAutoPhish\Migration\Uninstall</step></uninstall></repair-steps>
   <settings><admin>OCA\IntegrationAutoPhish\Settings\Admin</admin></settings>
 </info>
