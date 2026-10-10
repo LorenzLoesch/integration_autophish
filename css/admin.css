@@ -1,0 +1,6 @@
+#autophish-settings label { display: block; margin: 10px 0; }
+#autophish-settings input, #autophish-settings select { display: block; width: min(420px, 100%); }
+#autophish-settings table { margin: 20px 0; width: 100%; }
+#autophish-settings th, #autophish-settings td { padding: 8px; text-align: left; }
+#autophish-settings pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#autophish-message { min-height: 24px; }
