@@ -8,7 +8,7 @@ use RuntimeException;
 class SyncService {
     public function __construct(private GroupSource $source, private ApiClient $api) {}
 
-    /** Read complete snapshots, add missing members and verify additions. */
+    /** Add first, verify additions, then remove only memberships returned by the mapped list. */
     public function sync(array $connection, array $mapping, callable $isCurrent, ?callable $onProgress = null): array {
         return $this->api->withRequestGuard($isCurrent, fn (): array => $this->reconcile($connection, $mapping, $isCurrent, $onProgress));
     }
@@ -35,6 +35,21 @@ class SyncService {
             $destination = $this->readDestination($connection, $listId);
             if (array_diff_key($source['members'], $destination) !== []) {
                 throw new RuntimeException('Some required additions could not be verified; removals were blocked.');
+            }
+        }
+        if (!$result['removalBlocked']) {
+            foreach (array_diff_key($destination, $source['members']) as $member) {
+                $this->assertCurrent($isCurrent);
+                $key = bin2hex(random_bytes(16));
+                try {
+                    $this->api->removeMember($connection, $listId, $member['id'], $key);
+                } catch (ApiException $e) {
+                    if ($e->httpStatus !== 404) {
+                        throw $e;
+                    }
+                }
+                $result['removed']++;
+                if ($onProgress !== null) { $onProgress($result); }
             }
         }
         return $result;
