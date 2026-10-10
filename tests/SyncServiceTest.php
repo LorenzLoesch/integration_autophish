@@ -31,6 +31,30 @@ class SyncServiceTest extends TestCase {
         return ['id' => $id, 'email' => $email, 'targetListId' => 'list'];
     }
 
+    public function testAddsThenVerifiesThenPrunesOnlyMappedMembership(): void {
+        $events = [];
+        $api = $this->api();
+        $api->method('getList')->with($this->connection, 'list')->willReturn(['id' => 'list']);
+        $reads = 0;
+        $api->method('listMembers')->willReturnCallback(function () use (&$reads, &$events) {
+            $events[] = 'read';
+            return ++$reads === 1 ? [$this->member('old@example.com', 'old')] :
+                [$this->member('old@example.com', 'old'), $this->member('new@example.com', 'new')];
+        });
+        $api->expects(self::once())->method('addMembers')->willReturnCallback(function ($connection, $list, $members) use (&$events) {
+            self::assertSame('list', $list);
+            self::assertSame([['email' => 'new@example.com']], $members);
+            $events[] = 'add';
+            return 1;
+        });
+        $api->expects(self::once())->method('removeMember')->with($this->connection, 'list', 'old', self::isType('string'))
+            ->willReturnCallback(function () use (&$events) { $events[] = 'remove'; });
+        $result = (new SyncService($this->source(['new@example.com']), $api))->sync($this->connection, $this->mapping, fn () => true);
+        self::assertSame(['read', 'add', 'read', 'remove'], $events);
+        self::assertSame(1, $result['added']);
+        self::assertSame(1, $result['removed']);
+    }
+
     public function testRepeatKeepsExistingNamesAndMakesNoWrites(): void {
         $api = $this->api();
         $api->method('listMembers')->willReturn([$this->member('same@example.com') + ['firstName' => 'Keep']]);
@@ -60,6 +84,21 @@ class SyncServiceTest extends TestCase {
         self::assertSame(450, $result['added']);
     }
 
+    public function testConfirmedEmptyGroupRemovesAllMemberships(): void {
+        $api = $this->api();
+        $api->method('listMembers')->willReturn([$this->member('old@example.com')]);
+        $api->expects(self::once())->method('removeMember')->with($this->connection, 'list', 'member', self::isType('string'));
+        (new SyncService($this->source([]), $api))->sync($this->connection, $this->mapping, fn () => true);
+    }
+
+    public function testMissingSourceEmailBlocksRemoval(): void {
+        $api = $this->api();
+        $api->method('listMembers')->willReturn([$this->member('old@example.com')]);
+        $api->expects(self::never())->method('removeMember');
+        $result = (new SyncService($this->source([], true), $api))->sync($this->connection, $this->mapping, fn () => true);
+        self::assertTrue($result['removalBlocked']);
+    }
+
     public function testFailedAdditionBlocksAllRemovals(): void {
         $api = $this->api();
         $api->method('listMembers')->willReturn([$this->member('old@example.com')]);
@@ -87,6 +126,15 @@ class SyncServiceTest extends TestCase {
         (new SyncService($this->source([]), $api))->sync($this->connection, $this->mapping, fn () => true);
     }
 
+    public function testRevisionCheckBeforeEveryRemovalStopsFurtherWrites(): void {
+        $api = $this->api();
+        $api->method('listMembers')->willReturn([$this->member('a@example.com', 'a'), $this->member('b@example.com', 'b')]);
+        $api->expects(self::once())->method('removeMember')->with($this->connection, 'list', 'a', self::isType('string'));
+        $checks = 0;
+        $this->expectException(\RuntimeException::class);
+        (new SyncService($this->source([]), $api))->sync($this->connection, $this->mapping, function () use (&$checks) { return ++$checks <= 3; });
+    }
+
     public function testStaleRevisionBlocksAddition(): void {
         $api = $this->api();
         $api->method('listMembers')->willReturn([]);
@@ -94,6 +142,37 @@ class SyncServiceTest extends TestCase {
         $this->expectException(\RuntimeException::class);
         (new SyncService($this->source(['a@example.com']), $api))->sync($this->connection, $this->mapping, fn () => false);
     }
+    public function testAlreadyAbsentMembershipDoesNotStopRemainingRemovals(): void {
+        $api = $this->api();
+        $api->method('listMembers')->willReturn([$this->member('a@example.com', 'a'), $this->member('b@example.com', 'b')]);
+        $api->expects(self::exactly(2))->method('removeMember')->willReturnCallback(function ($connection, $list, $id) {
+            if ($id === 'a') {
+                throw new ApiException('not_found', 'Already absent', 404);
+            }
+        });
+        $result = (new SyncService($this->source([]), $api))->sync($this->connection, $this->mapping, fn () => true);
+        self::assertSame(2, $result['removed']);
+    }
+
+    public function testProgressPreservesCompletedRemovalBeforeInterruption(): void {
+        $api = $this->api();
+        $api->method('listMembers')->willReturn([$this->member('a@example.com', 'a'), $this->member('b@example.com', 'b')]);
+        $api->method('removeMember')->willReturnCallback(function ($connection, $list, $id) {
+            if ($id === 'b') { throw new ApiException('service', 'Unavailable', 503); }
+        });
+        $progress = [];
+        try {
+            (new SyncService($this->source([]), $api))->sync($this->connection, $this->mapping, fn () => true,
+                function (array $result) use (&$progress) { $progress[] = $result; });
+            self::fail('Expected interrupted reconciliation');
+        } catch (ApiException $e) {
+            self::assertSame('service', $e->category);
+        }
+        self::assertSame(0, $progress[0]['removed']);
+        self::assertSame(1, $progress[1]['removed']);
+        self::assertCount(2, $progress);
+    }
+
     public function testUnicodePayloadSizeSplitsBelowApiLimit(): void {
         $source = $this->createMock(GroupSource::class);
         $members = $destination = [];
