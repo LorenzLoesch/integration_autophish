@@ -9,7 +9,7 @@ stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/integration_autophish"
 # Runtime-only allowlist. Development dependencies and local state never enter a release.
-for entry in appinfo lib LICENSE README.md; do cp -R "$entry" "$stage/integration_autophish/"; done
+for entry in appinfo lib LICENSE license.md README.md; do cp -R "$entry" "$stage/integration_autophish/"; done
 for entry in templates js css img; do
   [[ ! -d $entry ]] || cp -R "$entry" "$stage/integration_autophish/"
 done

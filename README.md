@@ -2,7 +2,7 @@
 
 Mirror selected Nextcloud groups into dedicated AutoPhish target lists using the existing public API. This app does not send simulations or provision accounts.
 
-Supported baseline: **Nextcloud 32, PHP 8.3+** (within Nextcloud's supported PHP range). License: AGPL-3.0-or-later. Releases are unsigned manual-install packages; App Store publication is outside this release.
+Supported baseline: **Nextcloud 32, PHP 8.3+** (within Nextcloud's supported PHP range). License: [AGPL-3.0-or-later](license.md). Releases are unsigned manual-install packages; App Store publication is outside this release.
 
 ## Install and configure
 

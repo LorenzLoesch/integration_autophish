@@ -5,7 +5,7 @@
   <summary>Synchronize Nextcloud groups with AutoPhish target lists</summary>
   <description>Connect an AutoPhish company with a least-privilege API key and synchronize dedicated target lists from Nextcloud groups. Synchronization adds current members and removes stale list memberships.</description>
   <version>1.0.0</version>
-  <licence>agpl</licence>
+  <licence>AGPL-3.0-or-later</licence>
   <author>AutoPhish</author>
   <namespace>IntegrationAutoPhish</namespace>
   <category>integration</category>

@@ -8,3 +8,5 @@
 - [Implementation plan](implementation-plan.md): delivery and verification sequence.
 
 Installation, updates, data flow and removal are in the root [README](../README.md).
+
+Licensing and the App Store license requirement are in [license.md](../license.md); release packaging includes both license files.
