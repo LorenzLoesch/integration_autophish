@@ -13,6 +13,12 @@
     <php min-version="8.3" />
     <nextcloud min-version="32" max-version="32" />
   </dependencies>
+  <background-jobs>
+    <job>OCA\IntegrationAutoPhish\BackgroundJob\SyncJob</job>
+  </background-jobs>
+  <commands>
+    <command>OCA\IntegrationAutoPhish\Command\SyncCommand</command>
+  </commands>
   <repair-steps>
     <install>
       <step>OCA\IntegrationAutoPhish\Migration\Install</step>
