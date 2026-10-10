@@ -6,7 +6,7 @@ Supported baseline: **Nextcloud 32, PHP 8.3+** (within Nextcloud's supported PHP
 
 ## Install and configure
 
-1. Download `integration_autophish-<version>.tar.gz` and its SHA-256 file from [Releases](https://github.com/LorenzLoesch/integration_autophish/releases). Compare `sha256sum` with the published checksum. Extract into your configured writable Nextcloud app directory, normally `custom_apps/`, so `custom_apps/integration_autophish/appinfo/info.xml` exists. Set ownership to your Nextcloud service account.
+1. Download `integration_autophish-<version>.tar.gz` and its SHA-256 file from [Releases](https://github.com/LorenzLoesch/nextcloud_autophish_plugin/releases). Compare `sha256sum` with the published checksum. Extract into your configured writable Nextcloud app directory, normally `custom_apps/`, so `custom_apps/integration_autophish/appinfo/info.xml` exists. Set ownership to your Nextcloud service account.
 2. As that service account, run `php occ app:enable integration_autophish` from the Nextcloud directory. Enablement needs no AutoPhish credentials and makes no AutoPhish call.
 3. In AutoPhish, create an existing API key assigned to the intended company with **`targets:read` and `targets:write`**. Copy the company ID. Verify the email domains of intended recipients in AutoPhish before syncing. The app cannot grant scopes, change company assignments, or verify domains for you.
 4. Open **Administration settings → Additional settings → AutoPhish**. Set the HTTPS AutoPhish origin, company ID and key. Save, then test access/load available lists.
